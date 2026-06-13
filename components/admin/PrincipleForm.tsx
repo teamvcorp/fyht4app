@@ -95,10 +95,7 @@ export function PrincipleForm({
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 lg:items-start">
-        {/* Left — the principle's definition */}
-        <div className="flex flex-1 flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <Field label="Principle title">
         <input
           className={inputClass}
@@ -173,10 +170,7 @@ export function PrincipleForm({
           )
         }
       />
-        </div>
 
-        {/* Right — the Taekwondo program */}
-        <div className="flex flex-1 flex-col gap-4">
       {/* Book */}
       <div className="fyht-card flex flex-col gap-3 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-ink/50">
@@ -219,8 +213,6 @@ export function PrincipleForm({
       </Field>
 
       <BeltsEditor belts={f.belts} onChange={(b) => set("belts", b)} />
-        </div>
-      </div>
 
       <div className="flex items-center gap-3">
         <button
@@ -256,19 +248,33 @@ function PairEditor({
     <Field label={label} hint={hint}>
       <div className="flex flex-col gap-2">
         {rows.map((row, i) => (
-          <div key={i} className="flex gap-2">
-            <input
-              className={`${inputClass} w-2/5`}
-              value={row.a}
-              placeholder={aPlaceholder}
-              onChange={(e) => {
-                const next = [...rows];
-                next[i] = { ...row, a: e.target.value };
-                onChange(next);
-              }}
-            />
-            <input
-              className={`${inputClass} flex-1`}
+          <div
+            key={i}
+            className="flex flex-col gap-1.5 rounded-2xl bg-brand-50/30 p-2"
+          >
+            <div className="flex items-center gap-2">
+              <input
+                className={`${inputClass} flex-1`}
+                value={row.a}
+                placeholder={aPlaceholder}
+                onChange={(e) => {
+                  const next = [...rows];
+                  next[i] = { ...row, a: e.target.value };
+                  onChange(next);
+                }}
+              />
+              <button
+                type="button"
+                aria-label="Remove"
+                onClick={() => onChange(rows.filter((_, j) => j !== i))}
+                className="px-2 text-lg text-ink/40 hover:text-donow"
+              >
+                ×
+              </button>
+            </div>
+            <textarea
+              className={`${inputClass} resize-none`}
+              rows={2}
               value={row.b}
               placeholder={bPlaceholder}
               onChange={(e) => {
@@ -277,14 +283,6 @@ function PairEditor({
                 onChange(next);
               }}
             />
-            <button
-              type="button"
-              aria-label="Remove"
-              onClick={() => onChange(rows.filter((_, j) => j !== i))}
-              className="px-2 text-lg text-ink/40 hover:text-donow"
-            >
-              ×
-            </button>
           </div>
         ))}
         <button

@@ -32,7 +32,7 @@ export default async function EditPrinciplePage({
   const principle = existing ?? emptyPrinciple(step);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 lg:max-w-3xl">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-black text-ink">Rung {step}</h1>
         <Link href="/admin/principles" className="text-xs font-semibold text-brand">
