@@ -13,16 +13,20 @@ export function defaultProgress(): UserProgress {
 }
 
 /**
- * The lowest rung the user has NOT yet mastered — the highest rung the coach
- * will route a problem to. (If everything is mastered, returns TOTAL_STEPS.)
+ * The lowest rung NOT yet mastered in a progress object — the highest rung the
+ * coach will route a problem to. (If everything is mastered, returns TOTAL_STEPS.)
  */
-export function lowestUnlearnedStep(user: UserDoc | null): number {
-  const principles = user?.progress?.principles;
+export function lowestUnlearnedStepOf(progress?: UserProgress): number {
+  const principles = progress?.principles;
   if (!principles) return 1;
   for (let step = 1; step <= TOTAL_STEPS; step++) {
     if (principles[step]?.status !== "mastered") return step;
   }
   return TOTAL_STEPS;
+}
+
+export function lowestUnlearnedStep(user: UserDoc | null): number {
+  return lowestUnlearnedStepOf(user?.progress);
 }
 
 /** Ensure a user has a progress object; returns it. */

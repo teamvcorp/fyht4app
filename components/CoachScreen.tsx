@@ -5,19 +5,28 @@ import { Character } from "@/components/Character";
 import { CoachResponse } from "@/components/CoachResponse";
 import { UpgradeGate } from "@/components/UpgradeGate";
 import { MicButton } from "@/components/MicButton";
+import { SubjectPicker } from "@/components/SubjectPicker";
+import { NudgeCard } from "@/components/NudgeCard";
 import { useSpeechInput } from "@/components/useSpeechInput";
-import { askCoach } from "@/app/actions/coach";
+import { askCoach, type Nudge } from "@/app/actions/coach";
+import type { SubjectView } from "@/app/actions/subjects";
 import type { CoachResponse as CoachResponseType } from "@/lib/types";
 
 export function CoachScreen({
   isMember,
   dailyLimit,
+  subjects,
 }: {
   isMember: boolean;
   dailyLimit: number;
+  subjects: SubjectView[];
 }) {
+  const [selectedSubject, setSelectedSubject] = useState<SubjectView | null>(
+    subjects.length === 1 ? subjects[0] : null
+  );
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState<CoachResponseType | null>(null);
+  const [nudge, setNudge] = useState<Nudge | null>(null);
   const [gated, setGated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -44,14 +53,22 @@ export function CoachScreen({
   function submit(q?: string) {
     const text = (q ?? question).trim();
     if (!text || pending) return;
+    if (!selectedSubject) {
+      setError("Pick who this is about first.");
+      return;
+    }
     if (listening) stop();
     setQuestion(text);
     setError(null);
     setGated(false);
+    setNudge(null);
     startTransition(async () => {
-      const result = await askCoach(text);
+      const result = await askCoach(text, selectedSubject.id);
       if (result.ok) {
         setResponse(result.response);
+        setNudge(result.nudge ?? null);
+      } else if (result.reason === "no_subject") {
+        setError("Pick who this is about first.");
       } else if (result.reason === "quota") {
         setResponse(null);
         if (isMember) {
@@ -92,6 +109,12 @@ export function CoachScreen({
         </p>
       </div>
 
+      <SubjectPicker
+        initialSubjects={subjects}
+        selectedId={selectedSubject?.id ?? null}
+        onSelect={setSelectedSubject}
+      />
+
       {/* input */}
       <form
         className="w-full"
@@ -113,16 +136,19 @@ export function CoachScreen({
               }}
               rows={3}
               maxLength={1000}
+              disabled={!selectedSubject}
               placeholder={
-                listening
-                  ? "Listening… speak your question"
-                  : "Ask about a parenting challenge, a bonding idea, or family life…"
+                !selectedSubject
+                  ? "Pick who this is about first…"
+                  : listening
+                    ? "Listening… speak your question"
+                    : `Ask about ${selectedSubject.firstName}…`
               }
-              className={`w-full resize-none rounded-2xl bg-brand-50/60 px-4 py-3 text-[15px] text-ink outline-none placeholder:text-ink/40 focus:bg-brand-50 ${
+              className={`w-full resize-none rounded-2xl bg-brand-50/60 px-4 py-3 text-[15px] text-ink outline-none placeholder:text-ink/40 focus:bg-brand-50 disabled:opacity-60 ${
                 micSupported ? "pr-14" : ""
               }`}
             />
-            {micSupported && (
+            {micSupported && selectedSubject && (
               <MicButton
                 listening={listening}
                 onClick={toggleMic}
@@ -137,13 +163,14 @@ export function CoachScreen({
           )}
           <button
             type="submit"
-            disabled={pending || !question.trim()}
+            disabled={pending || !question.trim() || !selectedSubject}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-3.5 text-base font-bold text-white shadow-md transition active:scale-[0.99] disabled:opacity-50"
           >
             {pending ? "Consulting the codex…" : "Ask The Master"}
           </button>
         </div>
         <p className="mt-2 text-center text-xs text-ink/45">
+          {selectedSubject ? `About ${selectedSubject.firstName} · ` : ""}
           {isMember
             ? `Member · up to ${dailyLimit} questions/day`
             : "Free · 1 question per day"}
@@ -157,6 +184,16 @@ export function CoachScreen({
       <div className="w-full">
         {gated && <UpgradeGate />}
         {response && <CoachResponse response={response} />}
+        {nudge && (
+          <div className="mt-4">
+            <NudgeCard
+              step={nudge.step}
+              principleTitle={nudge.principleTitle}
+              count={nudge.count}
+              subjectName={selectedSubject?.firstName}
+            />
+          </div>
+        )}
       </div>
 
       {(response || gated) && !pending && (
@@ -164,6 +201,7 @@ export function CoachScreen({
           type="button"
           onClick={() => {
             setResponse(null);
+            setNudge(null);
             setGated(false);
             setQuestion("");
             setError(null);

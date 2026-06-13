@@ -193,6 +193,8 @@ export interface CoachResponse {
   routedPrincipleTitle?: string;
   /** Shown when routed below target ("build X first because…"). */
   routedReason?: string;
+  /** The subject this answer is about (first name). */
+  subjectName?: string;
   recommendedBook?: RecommendedBook;
   taekwondoUpsell: boolean;
   /** False => the question fell outside the codex; UI shows an honest message. */
@@ -205,5 +207,21 @@ export interface ConversationDoc {
   userId: string;
   question: string;
   response: CoachResponse;
+  // Denormalized for per-subject pattern queries.
+  subjectId?: string;
+  subjectName?: string;
+  routedStep?: number;
+  targetStep?: number;
+  createdAt: Date;
+}
+
+/** A person the user asks about (a child, etc.). One user → many subjects. */
+export interface SubjectDoc {
+  _id?: ObjectId;
+  userId: string;
+  firstName: string;
+  ageYears: number;
+  /** Their own ladder progress (same shape as a user's). */
+  progress?: UserProgress;
   createdAt: Date;
 }

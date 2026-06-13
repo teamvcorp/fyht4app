@@ -12,8 +12,10 @@ export default async function AdminLayout({
   const user = await getCurrentUser();
   if (!isAdminUser(user)) redirect("/");
 
+  // Mobile-first, but expands to a roomy workspace on desktop so editing
+  // rules, principles, and belts isn't cramped.
   return (
-    <div className="px-4">
+    <div className="mx-auto min-h-dvh w-full max-w-md px-4 pb-16 pt-3 lg:max-w-5xl lg:px-8">
       <div className="flex items-center justify-between pb-3 pt-1">
         <span className="flex items-center gap-1.5">
           <Wordmark className="text-base" />

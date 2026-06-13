@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { markMastered, toggleFactor } from "@/app/actions/progress";
+import { setSubjectMastered, setSubjectFactor } from "@/app/actions/subjects";
 import { BuyBookButton } from "@/components/BuyBookButton";
 
 export type RungView = {
@@ -14,6 +14,7 @@ export type RungView = {
   enrolled: boolean;
   bookOwned: boolean;
   canMaster: boolean;
+  recentCount?: number;
 };
 
 export type ProgressView = Record<
@@ -22,10 +23,12 @@ export type ProgressView = Record<
 >;
 
 export function JourneyLadder({
+  subjectId,
   rungs,
   progress,
   currentStep,
 }: {
+  subjectId: string;
   rungs: RungView[];
   progress: ProgressView;
   currentStep: number;
@@ -42,6 +45,7 @@ export function JourneyLadder({
         return (
           <RungCard
             key={rung.step}
+            subjectId={subjectId}
             rung={rung}
             state={state}
             p={progress[rung.step] ?? { mastered: false, factors: {} }}
@@ -53,10 +57,12 @@ export function JourneyLadder({
 }
 
 function RungCard({
+  subjectId,
   rung,
   state,
   p,
 }: {
+  subjectId: string;
   rung: RungView;
   state: "mastered" | "current" | "locked";
   p: { mastered: boolean; factors: Record<string, boolean> };
@@ -91,7 +97,7 @@ function RungCard({
               {mastered
                 ? "Mastered"
                 : state === "current"
-                  ? "Your current focus"
+                  ? "Current focus"
                   : `Unlock by mastering Tier ${rung.step - 1}`}
             </p>
           </div>
@@ -109,6 +115,12 @@ function RungCard({
           </div>
         </div>
 
+        {!!rung.recentCount && rung.recentCount > 0 && (
+          <p className="mt-2 text-xs font-semibold text-donow">
+            Came up {rung.recentCount}× recently
+          </p>
+        )}
+
         {!locked && rung.factors.length > 0 && (
           <div className="mt-3 flex flex-col gap-1.5">
             {rung.factors.map((factor) => (
@@ -122,7 +134,12 @@ function RungCard({
                   disabled={pending}
                   onChange={(e) =>
                     start(async () => {
-                      await toggleFactor(rung.step, factor, e.target.checked);
+                      await setSubjectFactor(
+                        subjectId,
+                        rung.step,
+                        factor,
+                        e.target.checked
+                      );
                     })
                   }
                   className="h-4 w-4 accent-brand"
@@ -133,11 +150,11 @@ function RungCard({
           </div>
         )}
 
-        {/* Gate: must read the book or enroll before mastering */}
+        {/* Gate: must read the book or complete Taekwondo before verifying mastery */}
         {!locked && !mastered && !rung.canMaster && (
           <div className="mt-3 rounded-2xl bg-brand-50/60 p-3">
             <p className="text-xs leading-relaxed text-ink/70">
-              To master this tier, read its book or enroll in its Taekwondo.
+              To mark this tier mastered, read its book or complete its Taekwondo.
             </p>
             <div className="mt-2 flex items-center gap-2">
               <BuyBookButton tier={rung.step} />
@@ -159,7 +176,11 @@ function RungCard({
               onClick={() =>
                 start(async () => {
                   setError(null);
-                  const r = await markMastered(rung.step, !mastered);
+                  const r = await setSubjectMastered(
+                    subjectId,
+                    rung.step,
+                    !mastered
+                  );
                   if (!r.ok && r.error) setError(r.error);
                 })
               }

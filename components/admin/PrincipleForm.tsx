@@ -95,7 +95,10 @@ export function PrincipleForm({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:gap-6 lg:items-start">
+        {/* Left — the principle's definition */}
+        <div className="flex flex-1 flex-col gap-4">
       <Field label="Principle title">
         <input
           className={inputClass}
@@ -170,7 +173,10 @@ export function PrincipleForm({
           )
         }
       />
+        </div>
 
+        {/* Right — the Taekwondo program */}
+        <div className="flex flex-1 flex-col gap-4">
       {/* Book */}
       <div className="fyht-card flex flex-col gap-3 p-4">
         <p className="text-xs font-bold uppercase tracking-wide text-ink/50">
@@ -213,6 +219,8 @@ export function PrincipleForm({
       </Field>
 
       <BeltsEditor belts={f.belts} onChange={(b) => set("belts", b)} />
+        </div>
+      </div>
 
       <div className="flex items-center gap-3">
         <button

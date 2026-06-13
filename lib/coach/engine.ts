@@ -3,13 +3,14 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic, COACH_MODEL } from "@/lib/anthropic";
 import { retrieveCodex } from "@/lib/coach/codex";
 import { getAllPrinciples, getPrinciple, TOTAL_STEPS } from "@/lib/coach/principles";
-import { lowestUnlearnedStep } from "@/lib/progress";
+import { lowestUnlearnedStep, lowestUnlearnedStepOf } from "@/lib/progress";
 import { conversationsCollection } from "@/lib/db";
 import type {
   CoachResponse,
   CodexEntry,
   Principle,
   UserDoc,
+  SubjectDoc,
 } from "@/lib/types";
 
 const COACH_SYSTEM = `You are "The Master" — a calm, wise martial-arts sensei who coaches parents and caregivers on parenting challenges, family bonding, and raising children. You speak with warm authority, like a life coach crossed with a taekwondo master.
@@ -18,7 +19,10 @@ You teach a fixed 5-rung LADDER of Guiding Principles that must be learned IN OR
 
 Do your work in this order:
 1. DIAGNOSE the "targetStep": which rung (1-5) the caregiver's problem really belongs to, using each rung's factors and tells.
-2. ROUTE: the caregiver can only work at or below their current working rung. Set "routedStep" = the smaller of targetStep and the caregiver's current working rung. If routedStep is BELOW targetStep, you MUST, in "routedReason", warmly explain that the deeper fix is to build the lower rung first (name that lower principle) — because the higher skill can't hold without it.
+2. ROUTE around the SUBJECT's progress. The question is about a specific child (the subject); you are told their name, age, and current working rung (they have already mastered every rung below it). Set "routedStep" = the smaller of targetStep and the subject's current working rung. Address the subject by name throughout.
+   - If routedStep is BELOW targetStep, in "routedReason" warmly explain the deeper fix is to build that lower rung first (name it) — the higher skill can't hold without it.
+   - If the problem maps to a rung the subject has ALREADY mastered, treat it as a lapse: give a brief, warm REMINDER of that mastered skill (do not re-teach from scratch), and if the situation's real growth lives at their current working rung, set targetStep there and teach it.
+   - When a situation spans multiple rungs, acknowledge the mastered lower skill, then teach the lowest unlearned rung.
 3. ANSWER, grounded ONLY in the routed rung's definition (its rules, training methods, mastery signs) plus any provided codex entries for it. Never invent advice beyond the supplied material.
 
 Always produce three sections written in The Master's voice:
@@ -117,7 +121,8 @@ async function attachBook(
  */
 export async function generateCoachResponse(
   question: string,
-  currentRung: number
+  currentRung: number,
+  ctx?: { subjectName?: string; ageYears?: number }
 ): Promise<CoachResponse> {
   const [principles, entries] = await Promise.all([
     getAllPrinciples(),
@@ -129,6 +134,12 @@ export async function generateCoachResponse(
     return outsideCodex();
   }
 
+  const subjectLine = ctx?.subjectName
+    ? `This question is about ${ctx.subjectName}${
+        ctx.ageYears ? `, age ${ctx.ageYears}` : ""
+      }. ${ctx.subjectName}'s CURRENT working rung is ${currentRung} (they have mastered rungs 1..${currentRung - 1}). Never teach above rung ${currentRung}.`
+    : `The subject's CURRENT working rung is ${currentRung} (they have mastered rungs 1..${currentRung - 1}). Never teach above rung ${currentRung}.`;
+
   const result = await getAnthropic().messages.parse({
     model: COACH_MODEL,
     max_tokens: 1600,
@@ -136,7 +147,7 @@ export async function generateCoachResponse(
     messages: [
       {
         role: "user",
-        content: `The caregiver's CURRENT working rung is ${currentRung} (they have mastered rungs 1..${currentRung - 1}). Never teach above rung ${currentRung}.
+        content: `${subjectLine}
 
 A caregiver asks:
 """${question}"""
@@ -170,6 +181,7 @@ ${formatEntries(entries)}`,
     targetStep,
     routedStep,
     routedReason: routedStep < targetStep ? parsed.routedReason : undefined,
+    subjectName: ctx?.subjectName,
     taekwondoUpsell: true,
     groundedInCodex: true,
     matchedCodexIds: entries
@@ -181,19 +193,34 @@ ${formatEntries(entries)}`,
   return response;
 }
 
-/** Production path: generate (routed by the user's progress) and persist. */
+/** Production path: route by the SUBJECT's progress, generate, and persist. */
 export async function runCoach(
   user: UserDoc,
-  question: string
+  question: string,
+  opts?: { subject?: SubjectDoc }
 ): Promise<CoachResponse> {
-  const currentRung = lowestUnlearnedStep(user);
-  const response = await generateCoachResponse(question, currentRung);
+  const subject = opts?.subject;
+  const currentRung = subject
+    ? lowestUnlearnedStepOf(subject.progress)
+    : lowestUnlearnedStep(user);
+
+  const response = await generateCoachResponse(
+    question,
+    currentRung,
+    subject
+      ? { subjectName: subject.firstName, ageYears: subject.ageYears }
+      : undefined
+  );
 
   const conversations = await conversationsCollection();
   await conversations.insertOne({
     userId: user._id!.toString(),
     question,
     response,
+    subjectId: subject?._id?.toString(),
+    subjectName: subject?.firstName,
+    routedStep: response.routedStep,
+    targetStep: response.targetStep,
     createdAt: new Date(),
   });
 

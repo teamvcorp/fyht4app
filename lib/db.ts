@@ -5,6 +5,7 @@ import type {
   CodexEntry,
   ConversationDoc,
   Principle,
+  SubjectDoc,
 } from "@/lib/types";
 
 export async function usersCollection(): Promise<Collection<UserDoc>> {
@@ -27,4 +28,9 @@ export async function conversationsCollection(): Promise<
 > {
   const db = await getDb();
   return db.collection<ConversationDoc>("conversations");
+}
+
+export async function subjectsCollection(): Promise<Collection<SubjectDoc>> {
+  const db = await getDb();
+  return db.collection<SubjectDoc>("subjects");
 }

@@ -40,7 +40,7 @@ export default async function EditEntryPage({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 lg:max-w-2xl">
       <h1 className="text-xl font-black text-ink">Edit entry</h1>
       <EntryForm
         entry={entry}
