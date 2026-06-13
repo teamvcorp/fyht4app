@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChipInput } from "@/components/ChipInput";
 import { Field, inputClass } from "@/components/admin/Field";
 import { saveEntry, deleteEntry, type EntryInput } from "@/app/actions/admin";
+import { useDraftState } from "@/components/admin/useDraftState";
 
 const EMPTY: EntryInput = {
   title: "",
@@ -27,7 +28,14 @@ export function EntryForm({
   principles: { step: number; title: string }[];
 }) {
   const router = useRouter();
-  const [form, setForm] = useState<EntryInput>(entry ?? EMPTY);
+  const draftKey = `bbp:draft:entry:${entry?._id ?? "new"}`;
+  const {
+    value: form,
+    set: setForm,
+    restored,
+    clearDraft,
+    discard,
+  } = useDraftState<EntryInput>(draftKey, entry ?? EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -38,9 +46,19 @@ export function EntryForm({
   function submit() {
     setError(null);
     start(async () => {
-      const r = await saveEntry(form);
-      if (r.ok) router.push("/admin/codex");
-      else setError(r.error ?? "Save failed.");
+      try {
+        const r = await saveEntry(form);
+        if (r.ok) {
+          clearDraft();
+          router.push("/admin/codex");
+        } else {
+          setError(r.error ?? "Save failed — your edits are still here.");
+        }
+      } catch {
+        setError(
+          "Couldn't save (your session may have refreshed). Your edits are kept as a draft — reload the page, then save again."
+        );
+      }
     });
   }
 
@@ -49,12 +67,28 @@ export function EntryForm({
     if (!confirm("Delete this codex entry?")) return;
     start(async () => {
       await deleteEntry(entry._id!);
+      clearDraft();
       router.push("/admin/codex");
     });
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {restored && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-donow-50 px-3 py-2 text-sm text-donow">
+          <span>Restored your unsaved edits.</span>
+          <button
+            type="button"
+            onClick={() => {
+              discard();
+              router.refresh();
+            }}
+            className="shrink-0 font-bold underline"
+          >
+            Discard
+          </button>
+        </div>
+      )}
       <Field label="Title">
         <input
           className={inputClass}

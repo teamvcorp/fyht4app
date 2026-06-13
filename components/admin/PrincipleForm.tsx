@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 import { Field, inputClass } from "@/components/admin/Field";
 import { VideoUpload } from "@/components/admin/VideoUpload";
 import { savePrinciple, type PrincipleInput } from "@/app/actions/admin";
+import { useDraftState } from "@/components/admin/useDraftState";
 import type { Belt, PrincipleFactor, PrincipleRule } from "@/lib/types";
 
 type FormState = {
   title: string;
   about: string;
   factors: PrincipleFactor[];
-  masterySignsText: string;
-  notLearnedTellsText: string;
-  trainingMethodsText: string;
+  masterySigns: string[];
+  notLearnedTells: string[];
+  trainingMethods: string[];
   rules: PrincipleRule[];
   bookTitle: string;
   bookAuthor: string;
@@ -22,9 +23,6 @@ type FormState = {
   priceDollars: number;
   belts: Belt[];
 };
-
-const lines = (s: string) =>
-  s.split("\n").map((x) => x.trim()).filter(Boolean);
 
 export function PrincipleForm({
   principle,
@@ -45,13 +43,15 @@ export function PrincipleForm({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
-  const [f, setF] = useState<FormState>({
+  const [error, setError] = useState<string | null>(null);
+
+  const initial: FormState = {
     title: principle.title,
     about: principle.about,
     factors: principle.factors.length ? principle.factors : [],
-    masterySignsText: principle.masterySigns.join("\n"),
-    notLearnedTellsText: principle.notLearnedTells.join("\n"),
-    trainingMethodsText: principle.trainingMethods.join("\n"),
+    masterySigns: principle.masterySigns ?? [],
+    notLearnedTells: principle.notLearnedTells ?? [],
+    trainingMethods: principle.trainingMethods ?? [],
     rules: principle.rules ?? [],
     bookTitle: principle.book.title ?? "",
     bookAuthor: principle.book.author ?? "",
@@ -59,7 +59,10 @@ export function PrincipleForm({
     bookProtagonist: principle.book.protagonistNote ?? "",
     priceDollars: Math.round((principle.tier.priceCents ?? 0) / 100),
     belts: principle.tier.belts ?? [],
-  });
+  };
+  const draftKey = `bbp:draft:principle:${principle.step}`;
+  const { value: f, set: setF, restored, clearDraft, discard } =
+    useDraftState<FormState>(draftKey, initial);
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setF((s) => ({ ...s, [k]: v }));
@@ -72,9 +75,9 @@ export function PrincipleForm({
       title: f.title.trim(),
       about: f.about.trim(),
       factors: f.factors.filter((x) => x.name.trim() || x.description.trim()),
-      masterySigns: lines(f.masterySignsText),
-      notLearnedTells: lines(f.notLearnedTellsText),
-      trainingMethods: lines(f.trainingMethodsText),
+      masterySigns: f.masterySigns.map((s) => s.trim()).filter(Boolean),
+      notLearnedTells: f.notLearnedTells.map((s) => s.trim()).filter(Boolean),
+      trainingMethods: f.trainingMethods.map((s) => s.trim()).filter(Boolean),
       rules: f.rules.filter((r) => r.situation.trim() || r.rule.trim()),
       book: {
         title: f.bookTitle.trim(),
@@ -88,14 +91,41 @@ export function PrincipleForm({
       },
     };
     start(async () => {
-      await savePrinciple(payload);
-      setSaved(true);
-      router.refresh();
+      setError(null);
+      try {
+        const r = await savePrinciple(payload);
+        if (!r?.ok) {
+          setError(r?.error || "Save failed — your edits are still here.");
+          return;
+        }
+        clearDraft();
+        setSaved(true);
+        router.refresh();
+      } catch {
+        setError(
+          "Couldn't save (your session may have refreshed). Your edits are kept as a draft — reload the page, then save again."
+        );
+      }
     });
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {restored && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-donow-50 px-3 py-2 text-sm text-donow">
+          <span>Restored your unsaved edits.</span>
+          <button
+            type="button"
+            onClick={() => {
+              discard();
+              router.refresh();
+            }}
+            className="shrink-0 font-bold underline"
+          >
+            Discard
+          </button>
+        </div>
+      )}
       <Field label="Principle title">
         <input
           className={inputClass}
@@ -129,32 +159,28 @@ export function PrincipleForm({
         }
       />
 
-      <Field label="Signs it IS mastered" hint="One per line.">
-        <textarea
-          className={`${inputClass} resize-none`}
-          rows={4}
-          value={f.masterySignsText}
-          onChange={(e) => set("masterySignsText", e.target.value)}
-        />
-      </Field>
+      <ListEditor
+        label="Signs it IS mastered"
+        placeholder="An observable sign of mastery…"
+        items={f.masterySigns}
+        onChange={(v) => set("masterySigns", v)}
+      />
 
-      <Field label="Tells it is NOT yet learned" hint="One per line — the coach diagnoses from these.">
-        <textarea
-          className={`${inputClass} resize-none`}
-          rows={4}
-          value={f.notLearnedTellsText}
-          onChange={(e) => set("notLearnedTellsText", e.target.value)}
-        />
-      </Field>
+      <ListEditor
+        label="Tells it is NOT yet learned"
+        hint="The coach diagnoses from these."
+        placeholder="A tell that it's not yet learned…"
+        items={f.notLearnedTells}
+        onChange={(v) => set("notLearnedTells", v)}
+      />
 
-      <Field label="Training methods" hint="One per line — concrete practices.">
-        <textarea
-          className={`${inputClass} resize-none`}
-          rows={3}
-          value={f.trainingMethodsText}
-          onChange={(e) => set("trainingMethodsText", e.target.value)}
-        />
-      </Field>
+      <ListEditor
+        label="Training methods"
+        hint="Concrete practices — add as many as you like."
+        placeholder="A concrete practice…"
+        items={f.trainingMethods}
+        onChange={(v) => set("trainingMethods", v)}
+      />
 
       {/* Situational rules */}
       <PairEditor
@@ -214,18 +240,78 @@ export function PrincipleForm({
 
       <BeltsEditor belts={f.belts} onChange={(b) => set("belts", b)} />
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={pending}
-          className="flex flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-3 font-bold text-white shadow-md transition active:scale-[0.99] disabled:opacity-50"
-        >
-          {pending ? "Saving…" : "Save principle"}
-        </button>
-        {saved && <span className="text-sm font-semibold text-fyht">Saved ✓</span>}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={submit}
+            disabled={pending}
+            className="flex flex-1 items-center justify-center rounded-2xl bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-3 font-bold text-white shadow-md transition active:scale-[0.99] disabled:opacity-50"
+          >
+            {pending ? "Saving…" : "Save principle"}
+          </button>
+          {saved && (
+            <span className="text-sm font-semibold text-fyht">Saved ✓</span>
+          )}
+        </div>
+        {error && (
+          <p className="rounded-xl bg-donow-50 px-3 py-2 text-sm font-medium text-donow">
+            {error}
+          </p>
+        )}
       </div>
     </div>
+  );
+}
+
+function ListEditor({
+  label,
+  hint,
+  placeholder,
+  items,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  placeholder?: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <div className="flex flex-col gap-2">
+        {items.map((item, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <textarea
+              className={`${inputClass} flex-1 resize-none`}
+              rows={2}
+              value={item}
+              placeholder={placeholder}
+              onChange={(e) => {
+                const next = [...items];
+                next[i] = e.target.value;
+                onChange(next);
+              }}
+            />
+            <button
+              type="button"
+              aria-label="Remove"
+              onClick={() => onChange(items.filter((_, j) => j !== i))}
+              className="px-2 pt-2 text-lg text-ink/40 hover:text-donow"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange([...items, ""])}
+          className="self-start rounded-full bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand active:scale-95"
+        >
+          + Add
+        </button>
+      </div>
+    </Field>
   );
 }
 
