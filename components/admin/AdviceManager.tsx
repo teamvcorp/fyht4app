@@ -88,8 +88,6 @@ function AdviceRow({
       const r = await saveAdvice({
         id: row.id || undefined,
         text: row.text,
-        audioUrl: row.audioUrl,
-        audioPathname: row.audioPathname,
         enabled: row.enabled,
       });
       if (r.ok) {

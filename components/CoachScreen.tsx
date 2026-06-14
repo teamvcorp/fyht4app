@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Character } from "@/components/Character";
 import { CoachResponse } from "@/components/CoachResponse";
 import { UpgradeGate } from "@/components/UpgradeGate";
@@ -37,6 +37,7 @@ export function CoachScreen({
   const [adviceText, setAdviceText] = useState<string | null>(null);
   const [speakingAdvice, setSpeakingAdvice] = useState(false);
   const adviceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playingRef = useRef(false);
   const liveRef = useRef({
     pending: false,
     response: false,
@@ -64,12 +65,28 @@ export function CoachScreen({
     }
   }
 
-  // Keep latest "busy" flags readable inside the long-lived scheduler.
+  // Keep latest "busy" flags readable inside the scheduler/handlers.
   liveRef.current = { pending, response: !!response, gated, listening };
+
+  function speakTTS(text: string, onend: () => void) {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return onend();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.95;
+      u.onend = onend;
+      u.onerror = onend;
+      synth.cancel();
+      synth.speak(u);
+    } catch {
+      onend();
+    }
+  }
 
   function stopAdvice() {
     setSpeakingAdvice(false);
     setAdviceText(null);
+    playingRef.current = false;
     try {
       window.speechSynthesis?.cancel();
     } catch {
@@ -88,53 +105,29 @@ export function CoachScreen({
     }
   }
 
-  // While idle, the Master periodically speaks a random advice line.
-  useEffect(() => {
-    if (!advice.length) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const schedule = (ms: number) => {
-      timer = setTimeout(tick, ms);
-    };
-
-    const speakTTS = (text: string, onend: () => void) => {
-      try {
-        const synth = window.speechSynthesis;
-        if (!synth) return onend();
-        const u = new SpeechSynthesisUtterance(text);
-        u.rate = 0.95;
-        u.onend = onend;
-        u.onerror = onend;
-        synth.cancel();
-        synth.speak(u);
-      } catch {
-        onend();
-      }
-    };
-
-    function tick() {
-      if (cancelled) return;
-      const s = liveRef.current;
-      if (s.pending || s.response || s.gated || s.listening) {
-        schedule(6000);
-        return;
+  // Speak one random advice line. `onDemand` (tap) bypasses the idle check.
+  const playRandomAdvice = useCallback(
+    (onDemand = false) => {
+      if (!advice.length || playingRef.current) return;
+      if (!onDemand) {
+        const s = liveRef.current;
+        if (s.pending || s.response || s.gated || s.listening) return;
       }
       const pick = advice[Math.floor(Math.random() * advice.length)];
+      playingRef.current = true;
       setAdviceText(pick.text);
       setSpeakingAdvice(true);
 
       let ended = false;
       const done = () => {
-        if (ended || cancelled) return;
+        if (ended) return;
         ended = true;
         clearTimeout(guard);
+        playingRef.current = false;
         setSpeakingAdvice(false);
         setAdviceText(null);
         adviceAudioRef.current = null;
-        schedule(15000 + Math.random() * 10000);
       };
-      // Safety: if audio/TTS never reports completion, move on anyway.
       const guard = setTimeout(done, 12000);
 
       if (pick.audioUrl) {
@@ -146,31 +139,34 @@ export function CoachScreen({
       } else {
         speakTTS(pick.text, done);
       }
-    }
+    },
+    [advice]
+  );
 
-    schedule(4500);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-      try {
-        window.speechSynthesis?.cancel();
-      } catch {
-        /* ignore */
-      }
-      const a = adviceAudioRef.current;
-      if (a) {
-        a.onended = null;
-        a.onerror = null;
-        try {
-          a.pause();
-        } catch {
-          /* ignore */
-        }
-        adviceAudioRef.current = null;
-      }
+  const playRef = useRef(playRandomAdvice);
+  playRef.current = playRandomAdvice;
+
+  // Browsers block autoplay until the first user gesture. Unlock on the first
+  // interaction, then speak a random line periodically while idle.
+  useEffect(() => {
+    if (!advice.length) return;
+    let unlocked = false;
+    const unlock = () => {
+      if (unlocked) return;
+      unlocked = true;
+      playRef.current(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [advice]);
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    const id = setInterval(() => {
+      if (unlocked) playRef.current(false);
+    }, 22000);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      clearInterval(id);
+    };
+  }, [advice.length]);
 
   function submit(q?: string) {
     const text = (q ?? question).trim();
@@ -219,7 +215,15 @@ export function CoachScreen({
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <Character state={characterState} />
+      <button
+        type="button"
+        onClick={() => playRandomAdvice(true)}
+        aria-label="Tap to hear the Master"
+        title="Tap to hear the Master"
+        className="rounded-full outline-none"
+      >
+        <Character state={characterState} />
+      </button>
 
       {/* speech bubble */}
       <div className="relative max-w-[19rem] rounded-3xl bg-white px-5 py-3 text-center shadow-[0_8px_20px_-10px_rgba(109,40,217,0.35)]">
@@ -237,6 +241,12 @@ export function CoachScreen({
                 : "What challenge are we solving today?"}
         </p>
       </div>
+
+      {advice.length > 0 && !response && !pending && (
+        <p className="-mt-2 text-[11px] font-medium text-brand/70">
+          🔊 Tap the Master to hear him
+        </p>
+      )}
 
       <SubjectPicker
         initialSubjects={subjects}
