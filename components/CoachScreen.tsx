@@ -5,6 +5,7 @@ import { Character } from "@/components/Character";
 import { CoachResponse } from "@/components/CoachResponse";
 import { UpgradeGate } from "@/components/UpgradeGate";
 import { MicButton } from "@/components/MicButton";
+import { unlockAudio, playUrl } from "@/components/masterVoice";
 import { SubjectPicker } from "@/components/SubjectPicker";
 import { NudgeCard } from "@/components/NudgeCard";
 import { useSpeechInput } from "@/components/useSpeechInput";
@@ -36,7 +37,7 @@ export function CoachScreen({
   // Idle "random advice" speech.
   const [adviceText, setAdviceText] = useState<string | null>(null);
   const [speakingAdvice, setSpeakingAdvice] = useState(false);
-  const adviceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const stopVoiceRef = useRef<(() => void) | null>(null);
   const playingRef = useRef(false);
   const liveRef = useRef({
     pending: false,
@@ -92,16 +93,9 @@ export function CoachScreen({
     } catch {
       /* ignore */
     }
-    const a = adviceAudioRef.current;
-    if (a) {
-      a.onended = null;
-      a.onerror = null;
-      try {
-        a.pause();
-      } catch {
-        /* ignore */
-      }
-      adviceAudioRef.current = null;
+    if (stopVoiceRef.current) {
+      stopVoiceRef.current();
+      stopVoiceRef.current = null;
     }
   }
 
@@ -126,16 +120,17 @@ export function CoachScreen({
         playingRef.current = false;
         setSpeakingAdvice(false);
         setAdviceText(null);
-        adviceAudioRef.current = null;
+        stopVoiceRef.current = null;
       };
       const guard = setTimeout(done, 12000);
 
       if (pick.audioUrl) {
-        const audio = new Audio(pick.audioUrl);
-        adviceAudioRef.current = audio;
-        audio.onended = done;
-        audio.onerror = () => speakTTS(pick.text, done);
-        audio.play().catch(() => speakTTS(pick.text, done));
+        playUrl(pick.audioUrl, done, () => speakTTS(pick.text, done)).then(
+          (stop) => {
+            if (ended) stop();
+            else stopVoiceRef.current = stop;
+          }
+        );
       } else {
         speakTTS(pick.text, done);
       }
@@ -154,6 +149,7 @@ export function CoachScreen({
     const unlock = () => {
       if (unlocked) return;
       unlocked = true;
+      unlockAudio();
       playRef.current(false);
     };
     window.addEventListener("pointerdown", unlock);
@@ -217,7 +213,10 @@ export function CoachScreen({
     <div className="flex flex-col items-center gap-5">
       <button
         type="button"
-        onClick={() => playRandomAdvice(true)}
+        onClick={() => {
+          unlockAudio();
+          playRandomAdvice(true);
+        }}
         aria-label="Tap to hear the Master"
         title="Tap to hear the Master"
         className="rounded-full outline-none"
