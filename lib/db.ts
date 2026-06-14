@@ -6,6 +6,7 @@ import type {
   ConversationDoc,
   Principle,
   SubjectDoc,
+  MasterAdvice,
 } from "@/lib/types";
 
 export async function usersCollection(): Promise<Collection<UserDoc>> {
@@ -33,4 +34,11 @@ export async function conversationsCollection(): Promise<
 export async function subjectsCollection(): Promise<Collection<SubjectDoc>> {
   const db = await getDb();
   return db.collection<SubjectDoc>("subjects");
+}
+
+export async function masterAdviceCollection(): Promise<
+  Collection<MasterAdvice>
+> {
+  const db = await getDb();
+  return db.collection<MasterAdvice>("masterAdvice");
 }

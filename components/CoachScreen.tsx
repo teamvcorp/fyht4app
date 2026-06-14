@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Character } from "@/components/Character";
 import { CoachResponse } from "@/components/CoachResponse";
 import { UpgradeGate } from "@/components/UpgradeGate";
@@ -16,10 +16,12 @@ export function CoachScreen({
   isMember,
   dailyLimit,
   subjects,
+  advice = [],
 }: {
   isMember: boolean;
   dailyLimit: number;
   subjects: SubjectView[];
+  advice?: { text: string; audioUrl?: string }[];
 }) {
   const [selectedSubject, setSelectedSubject] = useState<SubjectView | null>(
     subjects.length === 1 ? subjects[0] : null
@@ -30,6 +32,17 @@ export function CoachScreen({
   const [gated, setGated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Idle "random advice" speech.
+  const [adviceText, setAdviceText] = useState<string | null>(null);
+  const [speakingAdvice, setSpeakingAdvice] = useState(false);
+  const adviceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const liveRef = useRef({
+    pending: false,
+    response: false,
+    gated: false,
+    listening: false,
+  });
 
   // Voice dictation appends to whatever was typed before the mic was tapped.
   const speechBaseRef = useRef("");
@@ -44,11 +57,120 @@ export function CoachScreen({
     if (listening) {
       stop();
     } else {
+      stopAdvice();
       speechBaseRef.current = question.trim();
       setError(null);
       start();
     }
   }
+
+  // Keep latest "busy" flags readable inside the long-lived scheduler.
+  liveRef.current = { pending, response: !!response, gated, listening };
+
+  function stopAdvice() {
+    setSpeakingAdvice(false);
+    setAdviceText(null);
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      /* ignore */
+    }
+    const a = adviceAudioRef.current;
+    if (a) {
+      a.onended = null;
+      a.onerror = null;
+      try {
+        a.pause();
+      } catch {
+        /* ignore */
+      }
+      adviceAudioRef.current = null;
+    }
+  }
+
+  // While idle, the Master periodically speaks a random advice line.
+  useEffect(() => {
+    if (!advice.length) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const schedule = (ms: number) => {
+      timer = setTimeout(tick, ms);
+    };
+
+    const speakTTS = (text: string, onend: () => void) => {
+      try {
+        const synth = window.speechSynthesis;
+        if (!synth) return onend();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        u.onend = onend;
+        u.onerror = onend;
+        synth.cancel();
+        synth.speak(u);
+      } catch {
+        onend();
+      }
+    };
+
+    function tick() {
+      if (cancelled) return;
+      const s = liveRef.current;
+      if (s.pending || s.response || s.gated || s.listening) {
+        schedule(6000);
+        return;
+      }
+      const pick = advice[Math.floor(Math.random() * advice.length)];
+      setAdviceText(pick.text);
+      setSpeakingAdvice(true);
+
+      let ended = false;
+      const done = () => {
+        if (ended || cancelled) return;
+        ended = true;
+        clearTimeout(guard);
+        setSpeakingAdvice(false);
+        setAdviceText(null);
+        adviceAudioRef.current = null;
+        schedule(15000 + Math.random() * 10000);
+      };
+      // Safety: if audio/TTS never reports completion, move on anyway.
+      const guard = setTimeout(done, 12000);
+
+      if (pick.audioUrl) {
+        const audio = new Audio(pick.audioUrl);
+        adviceAudioRef.current = audio;
+        audio.onended = done;
+        audio.onerror = () => speakTTS(pick.text, done);
+        audio.play().catch(() => speakTTS(pick.text, done));
+      } else {
+        speakTTS(pick.text, done);
+      }
+    }
+
+    schedule(4500);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      try {
+        window.speechSynthesis?.cancel();
+      } catch {
+        /* ignore */
+      }
+      const a = adviceAudioRef.current;
+      if (a) {
+        a.onended = null;
+        a.onerror = null;
+        try {
+          a.pause();
+        } catch {
+          /* ignore */
+        }
+        adviceAudioRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advice]);
 
   function submit(q?: string) {
     const text = (q ?? question).trim();
@@ -58,6 +180,7 @@ export function CoachScreen({
       return;
     }
     if (listening) stop();
+    stopAdvice();
     setQuestion(text);
     setError(null);
     setGated(false);
@@ -88,7 +211,11 @@ export function CoachScreen({
     });
   }
 
-  const characterState = pending ? "thinking" : response ? "speaking" : "idle";
+  const characterState = pending
+    ? "thinking"
+    : response || speakingAdvice
+      ? "speaking"
+      : "idle";
 
   return (
     <div className="flex flex-col items-center gap-5">
@@ -105,7 +232,9 @@ export function CoachScreen({
             ? "Let me think on that…"
             : response
               ? "Here is your path. Walk it."
-              : "What challenge are we solving today?"}
+              : adviceText
+                ? adviceText
+                : "What challenge are we solving today?"}
         </p>
       </div>
 

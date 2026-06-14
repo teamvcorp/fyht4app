@@ -18,6 +18,16 @@ export async function POST(request: Request): Promise<Response> {
             "video/quicktime",
             "video/x-m4v",
             "video/x-matroska",
+            // Master advice voice clips
+            "audio/mpeg",
+            "audio/mp3",
+            "audio/wav",
+            "audio/x-wav",
+            "audio/webm",
+            "audio/ogg",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/aac",
           ],
           maximumSizeInBytes: 1024 * 1024 * 1024, // 1 GB
           addRandomSuffix: true,

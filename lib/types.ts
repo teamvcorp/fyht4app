@@ -215,6 +215,17 @@ export interface ConversationDoc {
   createdAt: Date;
 }
 
+/** A line of advice the Master speaks at random on the landing. */
+export interface MasterAdvice {
+  _id?: ObjectId;
+  text: string;
+  /** Public Vercel Blob URL of an optional pre-recorded voice clip. */
+  audioUrl?: string;
+  audioPathname?: string;
+  enabled: boolean;
+  createdAt: Date;
+}
+
 /** A person the user asks about (a child, etc.). One user → many subjects. */
 export interface SubjectDoc {
   _id?: ObjectId;

@@ -4,6 +4,7 @@ import { CoachScreen } from "@/components/CoachScreen";
 import { getCurrentUser, isActiveMember, isAdminUser } from "@/lib/user";
 import { dailyLimit } from "@/lib/quota";
 import { listSubjects } from "@/lib/subjects";
+import { getActiveAdvice } from "@/app/actions/master";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ export default async function HomePage() {
     firstName: s.firstName,
     ageYears: s.ageYears,
   }));
+  const advice = await getActiveAdvice();
 
   return (
     <>
@@ -37,6 +39,7 @@ export default async function HomePage() {
           isMember={isMember}
           dailyLimit={dailyLimit(user)}
           subjects={subjects}
+          advice={advice}
         />
       </main>
     </>
