@@ -10,6 +10,7 @@ import type {
   CodexEntry,
   Principle,
   UserDoc,
+  UserProgress,
   SubjectDoc,
 } from "@/lib/types";
 
@@ -23,6 +24,7 @@ Do your work in this order:
    - If routedStep is BELOW targetStep, in "routedReason" warmly explain the deeper fix is to build that lower rung first (name it) — the higher skill can't hold without it.
    - If the problem maps to a rung the subject has ALREADY mastered, treat it as a lapse: give a brief, warm REMINDER of that mastered skill (do not re-teach from scratch), and if the situation's real growth lives at their current working rung, set targetStep there and teach it.
    - When a situation spans multiple rungs, acknowledge the mastered lower skill, then teach the lowest unlearned rung.
+   - Aim the teaching at the subject's NOT-YET-practiced factors at the routed rung (you are told which factors they have already practiced).
 3. ANSWER, grounded ONLY in the routed rung's definition (its rules, training methods, mastery signs) plus any provided codex entries for it. Never invent advice beyond the supplied material.
 
 Always produce three sections written in The Master's voice:
@@ -77,6 +79,48 @@ function formatEntries(entries: CodexEntry[]): string {
     .join("\n");
 }
 
+/** Build the subject's precise position on the ladder for the prompt. */
+function formatLevel(
+  principles: Principle[],
+  currentRung: number,
+  progress: UserProgress | undefined,
+  name: string,
+  ageYears?: number
+): string {
+  const who = name || "The subject";
+  const header = name
+    ? `This question is about ${name}${ageYears ? `, age ${ageYears}` : ""}.`
+    : "";
+
+  const masteredAll =
+    principles.length > 0 &&
+    principles.every(
+      (p) => progress?.principles?.[p.step]?.status === "mastered"
+    );
+  if (masteredAll) {
+    return `${header} ${who} has MASTERED all five rungs — reinforce and refine; you may teach at any rung, deepest first.`.trim();
+  }
+
+  const lines = principles.map((p) => {
+    if (p.step < currentRung) return `  Rung ${p.step} ${p.title}: mastered`;
+    if (p.step > currentRung) return `  Rung ${p.step} ${p.title}: not yet reached`;
+    // Current focus rung — show per-factor practice.
+    const fmap = progress?.principles?.[p.step]?.factors ?? {};
+    const names = (p.factors ?? []).map((f) => f.name).filter(Boolean);
+    const practiced = names.filter((n) => fmap[n]);
+    const notYet = names.filter((n) => !fmap[n]);
+    const detail = names.length
+      ? `\n    practiced: ${practiced.length ? practiced.join(", ") : "none yet"}` +
+        `\n    not yet: ${notYet.length ? notYet.join(", ") : "—"}`
+      : "";
+    return `  Rung ${p.step} ${p.title}: CURRENT FOCUS${detail}`;
+  });
+
+  return `${header} ${who}'s position on the ladder:
+${lines.join("\n")}
+Never teach above rung ${currentRung}. Target the "not yet" factors at the current-focus rung.`.trim();
+}
+
 function clampStep(n: number, max: number): number {
   if (!Number.isFinite(n)) return 1;
   return Math.max(1, Math.min(Math.round(n), max));
@@ -121,7 +165,7 @@ async function attachBook(
 export async function generateCoachResponse(
   question: string,
   currentRung: number,
-  ctx?: { subjectName?: string; ageYears?: number }
+  ctx?: { subjectName?: string; ageYears?: number; progress?: UserProgress }
 ): Promise<CoachResponse> {
   const [principles, entries] = await Promise.all([
     getAllPrinciples(),
@@ -133,11 +177,13 @@ export async function generateCoachResponse(
     return outsideCodex();
   }
 
-  const subjectLine = ctx?.subjectName
-    ? `This question is about ${ctx.subjectName}${
-        ctx.ageYears ? `, age ${ctx.ageYears}` : ""
-      }. ${ctx.subjectName}'s CURRENT working rung is ${currentRung} (they have mastered rungs 1..${currentRung - 1}). Never teach above rung ${currentRung}.`
-    : `The subject's CURRENT working rung is ${currentRung} (they have mastered rungs 1..${currentRung - 1}). Never teach above rung ${currentRung}.`;
+  const subjectStatus = formatLevel(
+    principles,
+    currentRung,
+    ctx?.progress,
+    ctx?.subjectName ?? "",
+    ctx?.ageYears
+  );
 
   const result = await getAnthropic().messages.parse({
     model: COACH_MODEL,
@@ -146,7 +192,7 @@ export async function generateCoachResponse(
     messages: [
       {
         role: "user",
-        content: `${subjectLine}
+        content: `${subjectStatus}
 
 A caregiver asks:
 """${question}"""
@@ -206,7 +252,11 @@ export async function runCoach(
     question,
     currentRung,
     subject
-      ? { subjectName: subject.firstName, ageYears: subject.ageYears }
+      ? {
+          subjectName: subject.firstName,
+          ageYears: subject.ageYears,
+          progress: subject.progress,
+        }
       : undefined
   );
 
