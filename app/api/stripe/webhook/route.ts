@@ -7,25 +7,6 @@ import {
   setSubscriptionByUserId,
 } from "@/lib/stripe";
 import { usersCollection } from "@/lib/db";
-import { beltKey } from "@/lib/taekwondo";
-
-async function markBeltTestPaid(
-  userId: string,
-  tier: number,
-  beltIndex: number
-): Promise<void> {
-  const users = await usersCollection();
-  const k = beltKey(tier, beltIndex);
-  await users.updateOne(
-    { _id: new ObjectId(userId) },
-    {
-      $set: {
-        [`taekwondo.beltTests.${k}.paidAt`]: new Date().toISOString(),
-        [`taekwondo.beltTests.${k}.status`]: "paid",
-      },
-    }
-  );
-}
 
 // Stripe requires the raw request body to verify the signature.
 export async function POST(req: Request) {
@@ -53,12 +34,6 @@ export async function POST(req: Request) {
     case "checkout.session.completed": {
       const session = event.data.object;
       const md = session.metadata ?? {};
-
-      // One-time $20 belt-test fee.
-      if (md.type === "belt_test" && md.userId) {
-        await markBeltTestPaid(md.userId, Number(md.tier), Number(md.beltIndex));
-        break;
-      }
 
       // One-time $25 book purchase.
       if (md.type === "book" && md.userId) {

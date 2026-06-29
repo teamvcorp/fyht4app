@@ -8,7 +8,7 @@ import {
 } from "@/components/JourneyLadder";
 import { getCurrentUser, isActiveMember, isAdminUser } from "@/lib/user";
 import { getAllPrinciples } from "@/lib/coach/principles";
-import { lowestUnlearnedStepOf, isEnrolledTier, ownsBook } from "@/lib/progress";
+import { lowestUnlearnedStepOf, ownsBook } from "@/lib/progress";
 import {
   getSubject,
   canVerifySubjectRung,
@@ -40,10 +40,8 @@ export default async function SubjectJourneyPage({
       title: p?.title ?? "",
       about: p?.about ?? "",
       factors: (p?.factors ?? []).map((f) => f.name).filter(Boolean),
-      priceDollars: Math.round((p?.tier?.priceCents ?? 0) / 100),
-      enrolled: isEnrolledTier(user, step),
       bookOwned: ownsBook(user, step),
-      canMaster: await canVerifySubjectRung(user, step),
+      canMaster: canVerifySubjectRung(user, step),
       recentCount: await recentRungCount(userId, subjectId, step),
     });
   }

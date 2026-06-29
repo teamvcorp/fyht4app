@@ -3,18 +3,14 @@
 import { ObjectId } from "mongodb";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin";
-import { codexCollection, principlesCollection, usersCollection } from "@/lib/db";
+import { codexCollection, principlesCollection } from "@/lib/db";
 import { retrieveCodex } from "@/lib/coach/codex";
 import { generateCoachResponse } from "@/lib/coach/engine";
-import { getPrinciple } from "@/lib/coach/principles";
-import { signedBlobUrl } from "@/lib/blob";
-import { beltKey } from "@/lib/taekwondo";
 import type {
   CodexEntry,
   Principle,
   PrincipleFactor,
   PrincipleRule,
-  Belt,
   CoachResponse,
 } from "@/lib/types";
 
@@ -84,7 +80,6 @@ export type PrincipleInput = {
   trainingMethods: string[];
   rules: PrincipleRule[];
   book: { title: string; author?: string; purchaseUrl?: string; protagonistNote?: string };
-  tier: { priceCents: number; belts: Belt[] };
 };
 
 export async function savePrinciple(input: PrincipleInput): Promise<ActionResult> {
@@ -125,86 +120,3 @@ export async function previewCoach(
   };
 }
 
-/** Mint a signed playback URL for a private lesson/submission video (admin). */
-export async function getSignedVideoUrl(
-  pathname: string
-): Promise<string | null> {
-  await requireAdmin();
-  if (!pathname) return null;
-  try {
-    return await signedBlobUrl(pathname);
-  } catch {
-    return null;
-  }
-}
-
-export type BeltSubmission = {
-  userId: string;
-  userName: string;
-  userEmail: string;
-  tier: number;
-  beltIndex: number;
-  submissionPathname?: string;
-  submittedAt?: string;
-};
-
-export async function listBeltSubmissions(): Promise<BeltSubmission[]> {
-  await requireAdmin();
-  const users = await usersCollection();
-  const docs = await users
-    .find({ "taekwondo.beltTests": { $exists: true } })
-    .toArray();
-
-  const out: BeltSubmission[] = [];
-  for (const u of docs) {
-    const tests = u.taekwondo?.beltTests ?? {};
-    for (const [key, t] of Object.entries(tests)) {
-      if (t.status !== "submitted") continue;
-      const m = key.match(/^t(\d+)b(\d+)$/);
-      if (!m) continue;
-      out.push({
-        userId: u._id!.toString(),
-        userName: u.name ?? "",
-        userEmail: u.email,
-        tier: Number(m[1]),
-        beltIndex: Number(m[2]),
-        submissionPathname: t.submissionPathname,
-        submittedAt: t.submittedAt,
-      });
-    }
-  }
-  out.sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""));
-  return out;
-}
-
-export async function reviewBeltTest(
-  userId: string,
-  tier: number,
-  beltIndex: number,
-  pass: boolean,
-  note: string
-): Promise<ActionResult> {
-  await requireAdmin();
-  const users = await usersCollection();
-  const k = beltKey(tier, beltIndex);
-  const set: Record<string, unknown> = {
-    [`taekwondo.beltTests.${k}.status`]: pass ? "passed" : "failed",
-    [`taekwondo.beltTests.${k}.reviewedAt`]: new Date().toISOString(),
-    [`taekwondo.beltTests.${k}.reviewerNote`]: note ?? "",
-  };
-
-  // Passing the FINAL belt of a tier masters that principle on the ladder.
-  if (pass) {
-    const principle = await getPrinciple(tier);
-    const lastBelt = (principle?.tier?.belts?.length ?? 0) - 1;
-    if (lastBelt >= 0 && beltIndex === lastBelt) {
-      set[`progress.principles.${tier}.status`] = "mastered";
-      set[`progress.principles.${tier}.source`] = "taekwondo";
-      set[`progress.principles.${tier}.updatedAt`] = new Date();
-    }
-  }
-
-  await users.updateOne({ _id: new ObjectId(userId) }, { $set: set });
-  revalidatePath("/admin/reviews");
-  return { ok: true };
-}

@@ -15,7 +15,6 @@ function emptyPrinciple(step: number): Principle {
     trainingMethods: [],
     rules: [],
     book: { title: "" },
-    tier: { priceCents: 0, belts: [] },
   };
 }
 
@@ -50,7 +49,6 @@ export default async function EditPrinciplePage({
           trainingMethods: principle.trainingMethods ?? [],
           rules: principle.rules ?? [],
           book: principle.book ?? { title: "" },
-          tier: principle.tier ?? { priceCents: 0, belts: [] },
         }}
       />
     </div>

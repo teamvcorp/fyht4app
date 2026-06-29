@@ -1,14 +1,13 @@
 /**
- * Bootstraps the 5 Guiding Principle shells (steps 1-5) with structural
- * scaffolding only — belts + tier price. The confidential content (title,
- * about, factors, mastery signs, tells, rules, training, book) is authored by
- * the owner in /admin/principles. Non-destructive: uses $setOnInsert so it
- * never overwrites authored content. Run:  npm run seed:principles
+ * Bootstraps the 5 Guiding Principle shells (steps 1-5). The confidential
+ * content (title, about, factors, mastery signs, tells, rules, training, book)
+ * is authored by the owner in /admin/principles. Non-destructive: uses
+ * $setOnInsert so it never overwrites authored content. Run: npm run seed:principles
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { MongoClient } from "mongodb";
-import type { Principle, Belt } from "../lib/types";
+import type { Principle } from "../lib/types";
 
 function loadEnv() {
   try {
@@ -24,24 +23,6 @@ function loadEnv() {
   }
 }
 
-function belts(names: string[]): Belt[] {
-  return names.map((name) => ({
-    name,
-    lessons: Array.from({ length: 4 }, () => ({ name: "", focus: "" })),
-  }));
-}
-
-const SCAFFOLD: Array<Pick<Principle, "step"> & {
-  priceCents: number;
-  beltNames: string[];
-}> = [
-  { step: 1, priceCents: 90000, beltNames: ["White", "Yellow", "Orange"] },
-  { step: 2, priceCents: 120000, beltNames: ["Green", "Purple", "Light Blue"] },
-  { step: 3, priceCents: 150000, beltNames: ["Dark Blue", "Brown", "Red"] },
-  { step: 4, priceCents: 180000, beltNames: ["Deputy Black Belt"] },
-  { step: 5, priceCents: 210000, beltNames: ["Black Belt"] },
-];
-
 async function main() {
   loadEnv();
   const uri = process.env.MONGODB_URI;
@@ -53,12 +34,12 @@ async function main() {
   const db = client.db(dbName);
   const principles = db.collection<Principle>("principles");
 
-  for (const s of SCAFFOLD) {
+  for (const step of [1, 2, 3, 4, 5]) {
     await principles.updateOne(
-      { step: s.step },
+      { step },
       {
         $setOnInsert: {
-          step: s.step,
+          step,
           title: "",
           about: "",
           factors: [],
@@ -67,7 +48,6 @@ async function main() {
           trainingMethods: [],
           rules: [],
           book: { title: "" },
-          tier: { priceCents: s.priceCents, belts: belts(s.beltNames) },
           updatedAt: new Date(),
         },
       },

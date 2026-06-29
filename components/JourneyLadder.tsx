@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { setSubjectMastered, setSubjectFactor } from "@/app/actions/subjects";
 import { BuyBookButton } from "@/components/BuyBookButton";
 
@@ -10,8 +9,6 @@ export type RungView = {
   title: string;
   about: string;
   factors: string[];
-  priceDollars: number;
-  enrolled: boolean;
   bookOwned: boolean;
   canMaster: boolean;
   recentCount?: number;
@@ -102,11 +99,6 @@ function RungCard({
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
-            {rung.enrolled && (
-              <span className="rounded-full bg-fyht/10 px-2 py-0.5 text-[10px] font-bold uppercase text-fyht">
-                Enrolled
-              </span>
-            )}
             {rung.bookOwned && (
               <span className="rounded-full bg-dolater-50 px-2 py-0.5 text-[10px] font-bold uppercase text-dolater">
                 Book ✓
@@ -150,20 +142,14 @@ function RungCard({
           </div>
         )}
 
-        {/* Gate: must read the book or complete Taekwondo before verifying mastery */}
+        {/* Gate: must own this tier's book before verifying mastery */}
         {!locked && !mastered && !rung.canMaster && (
           <div className="mt-3 rounded-2xl bg-brand-50/60 p-3">
             <p className="text-xs leading-relaxed text-ink/70">
-              To mark this tier mastered, read its book or complete its Taekwondo.
+              Read this tier&apos;s book to mark it mastered.
             </p>
             <div className="mt-2 flex items-center gap-2">
               <BuyBookButton tier={rung.step} />
-              <Link
-                href={`/train/${rung.step}`}
-                className="rounded-xl bg-gradient-to-r from-brand-700 to-brand-600 px-3 py-2 text-xs font-bold text-white active:scale-95"
-              >
-                🥋 Enroll
-              </Link>
             </div>
           </div>
         )}

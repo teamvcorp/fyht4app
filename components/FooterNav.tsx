@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/journey", label: "Journey", icon: "🧭" },
   { href: "/account", label: "Account", icon: "⚙️" },
-  { href: "/train", label: "Taekwondo", icon: "🥋" },
-  { href: "/membership?from=book", label: "Book", icon: "📖" },
+  { href: "/membership", label: "Membership", icon: "⭐" },
 ];
 
 const SISTER_APPS = [

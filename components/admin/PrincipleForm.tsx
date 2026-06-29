@@ -3,10 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Field, inputClass } from "@/components/admin/Field";
-import { VideoUpload } from "@/components/admin/VideoUpload";
 import { savePrinciple, type PrincipleInput } from "@/app/actions/admin";
 import { useDraftState } from "@/components/admin/useDraftState";
-import type { Belt, PrincipleFactor, PrincipleRule } from "@/lib/types";
+import type { PrincipleFactor, PrincipleRule } from "@/lib/types";
 
 type FormState = {
   title: string;
@@ -20,8 +19,6 @@ type FormState = {
   bookAuthor: string;
   bookUrl: string;
   bookProtagonist: string;
-  priceDollars: number;
-  belts: Belt[];
 };
 
 export function PrincipleForm({
@@ -37,7 +34,6 @@ export function PrincipleForm({
     trainingMethods: string[];
     rules: PrincipleRule[];
     book: { title: string; author?: string; purchaseUrl?: string; protagonistNote?: string };
-    tier: { priceCents: number; belts: Belt[] };
   };
 }) {
   const router = useRouter();
@@ -57,8 +53,6 @@ export function PrincipleForm({
     bookAuthor: principle.book.author ?? "",
     bookUrl: principle.book.purchaseUrl ?? "",
     bookProtagonist: principle.book.protagonistNote ?? "",
-    priceDollars: Math.round((principle.tier.priceCents ?? 0) / 100),
-    belts: principle.tier.belts ?? [],
   };
   const draftKey = `bbp:draft:principle:${principle.step}`;
   const { value: f, set: setF, restored, clearDraft, discard } =
@@ -84,10 +78,6 @@ export function PrincipleForm({
         author: f.bookAuthor.trim() || undefined,
         purchaseUrl: f.bookUrl.trim() || undefined,
         protagonistNote: f.bookProtagonist.trim() || undefined,
-      },
-      tier: {
-        priceCents: Math.round((Number(f.priceDollars) || 0) * 100),
-        belts: f.belts,
       },
     };
     start(async () => {
@@ -227,18 +217,6 @@ export function PrincipleForm({
           placeholder="Protagonist note (age-matched journey)"
         />
       </div>
-
-      {/* Tier */}
-      <Field label="Tier price (USD)">
-        <input
-          type="number"
-          className={inputClass}
-          value={f.priceDollars}
-          onChange={(e) => set("priceDollars", Number(e.target.value))}
-        />
-      </Field>
-
-      <BeltsEditor belts={f.belts} onChange={(b) => set("belts", b)} />
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
@@ -383,108 +361,3 @@ function PairEditor({
   );
 }
 
-function BeltsEditor({
-  belts,
-  onChange,
-}: {
-  belts: Belt[];
-  onChange: (b: Belt[]) => void;
-}) {
-  return (
-    <Field label="Belts & lessons">
-      <div className="flex flex-col gap-3">
-        {belts.map((belt, bi) => (
-          <div key={bi} className="fyht-card flex flex-col gap-2 p-3">
-            <div className="flex gap-2">
-              <input
-                className={`${inputClass} flex-1`}
-                value={belt.name}
-                placeholder="Belt name"
-                onChange={(e) => {
-                  const next = [...belts];
-                  next[bi] = { ...belt, name: e.target.value };
-                  onChange(next);
-                }}
-              />
-              <button
-                type="button"
-                aria-label="Remove belt"
-                onClick={() => onChange(belts.filter((_, j) => j !== bi))}
-                className="px-2 text-lg text-ink/40 hover:text-donow"
-              >
-                ×
-              </button>
-            </div>
-            {belt.lessons.map((lesson, li) => {
-              const patchLesson = (patch: Partial<(typeof belt.lessons)[number]>) => {
-                const next = [...belts];
-                const lessons = [...belt.lessons];
-                lessons[li] = { ...lesson, ...patch };
-                next[bi] = { ...belt, lessons };
-                onChange(next);
-              };
-              return (
-                <div
-                  key={li}
-                  className="ml-3 flex flex-col gap-2 rounded-2xl bg-brand-50/40 p-2"
-                >
-                  <div className="flex gap-2">
-                    <input
-                      className={`${inputClass} w-2/5`}
-                      value={lesson.name}
-                      placeholder="Lesson name"
-                      onChange={(e) => patchLesson({ name: e.target.value })}
-                    />
-                    <input
-                      className={`${inputClass} flex-1`}
-                      value={lesson.focus ?? ""}
-                      placeholder="Focus (short)"
-                      onChange={(e) => patchLesson({ focus: e.target.value })}
-                    />
-                  </div>
-                  <textarea
-                    className={`${inputClass} resize-none`}
-                    rows={3}
-                    value={lesson.instruction ?? ""}
-                    placeholder="Written instruction (the text section)…"
-                    onChange={(e) => patchLesson({ instruction: e.target.value })}
-                  />
-                  <VideoUpload
-                    value={{
-                      videoUrl: lesson.videoUrl,
-                      videoPathname: lesson.videoPathname,
-                    }}
-                    onChange={(v) => patchLesson(v)}
-                  />
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => {
-                const next = [...belts];
-                next[bi] = {
-                  ...belt,
-                  lessons: [...belt.lessons, { name: "", focus: "" }],
-                };
-                onChange(next);
-              }}
-              className="ml-3 self-start text-xs font-bold text-brand"
-            >
-              + lesson
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={() =>
-            onChange([...belts, { name: "", lessons: [{ name: "", focus: "" }] }])
-          }
-          className="self-start rounded-full bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand active:scale-95"
-        >
-          + Add belt
-        </button>
-      </div>
-    </Field>
-  );
-}

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/user";
 import { getStripe } from "@/lib/stripe";
 import { getPrinciple } from "@/lib/coach/principles";
-import { BOOK_FEE_CENTS } from "@/lib/taekwondo";
+
+const BOOK_FEE_CENTS = 2500;
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();

@@ -38,16 +38,9 @@ export function ownsBook(user: UserDoc | null, tier: number): boolean {
   return !!user?.booksOwned?.includes(tier);
 }
 
-export function isEnrolledTier(user: UserDoc | null, tier: number): boolean {
-  return !!user?.taekwondo?.enrolledTiers?.includes(tier);
-}
-
-/**
- * A tier may only be marked mastered once the user has committed to the work —
- * either by enrolling in that tier's Taekwondo OR by buying that tier's book.
- */
+/** A tier may be marked mastered once the user owns that tier's book. */
 export function canMasterTier(user: UserDoc | null, tier: number): boolean {
-  return isEnrolledTier(user, tier) || ownsBook(user, tier);
+  return ownsBook(user, tier);
 }
 
 export async function setPrincipleStatus(

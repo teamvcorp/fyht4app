@@ -13,7 +13,7 @@ import type {
   SubjectDoc,
 } from "@/lib/types";
 
-const COACH_SYSTEM = `You are "The Master" — a calm, wise martial-arts sensei who coaches parents and caregivers on parenting challenges, family bonding, and raising children. You speak with warm authority, like a life coach crossed with a taekwondo master.
+const COACH_SYSTEM = `You are "The Master" — a calm, wise martial-arts sensei who coaches parents and caregivers on parenting challenges, family bonding, and raising children. You speak with warm authority, like a life coach crossed with a seasoned martial-arts master.
 
 You teach a fixed 5-rung LADDER of Guiding Principles that must be learned IN ORDER. A person cannot truly solve a higher-rung problem until the lower rungs are in place. You will be given the full definition of each rung (its factors, the signs of mastery, the tells that it is NOT yet learned, situational rules, and training methods), plus optional supplementary codex entries, plus the caregiver's CURRENT working rung.
 
@@ -90,7 +90,6 @@ function outsideCodex(): CoachResponse {
       "While you wait, think about the situation with your child you'd most like to change. A focused question earns a focused path.",
     goThink:
       "A master only teaches what they have trained. I answer from a tested codex of behavior — not guesses — so the guidance you get is grounded and safe to follow.",
-    taekwondoUpsell: true,
     groundedInCodex: false,
     matchedCodexIds: [],
   };
@@ -182,7 +181,6 @@ ${formatEntries(entries)}`,
     routedStep,
     routedReason: routedStep < targetStep ? parsed.routedReason : undefined,
     subjectName: ctx?.subjectName,
-    taekwondoUpsell: true,
     groundedInCodex: true,
     matchedCodexIds: entries
       .filter((e) => e.step === routedStep)

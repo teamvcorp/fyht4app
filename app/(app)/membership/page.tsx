@@ -68,23 +68,6 @@ export default async function MembershipPage() {
           </div>
         </div>
 
-        {/* The deeper commitment: the Taekwondo program */}
-        <Link
-          href="/train"
-          className="fyht-card flex items-center gap-3 p-4 transition active:scale-[0.99]"
-        >
-          <span className="text-2xl" aria-hidden>
-            🥋
-          </span>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-ink">Taekwondo program</p>
-            <p className="text-xs text-ink/55">
-              Paced lessons, belt tests, and a real black belt — the deeper path.
-            </p>
-          </div>
-          <span className="text-ink/30">→</span>
-        </Link>
-
         <Link href="/" className="text-center text-sm font-semibold text-brand">
           Maybe later
         </Link>

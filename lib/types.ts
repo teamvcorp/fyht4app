@@ -17,50 +17,13 @@ export interface UserPrincipleProgress {
   status: PrincipleStatus;
   /** Self-reported per-factor practice, keyed by factor name. */
   factors?: Record<string, boolean>;
-  source?: "self" | "taekwondo";
+  source?: "self";
   updatedAt?: Date;
 }
 
 export interface UserProgress {
   /** Keyed by step (1..5). */
   principles: Record<number, UserPrincipleProgress>;
-}
-
-// --- Taekwondo program (paced lessons + belt testing) ---
-
-export interface LessonProgress {
-  /** When the user first opened this lesson — its week starts here. */
-  firstAccessedAt: string;
-  /** Number of watches completed to the end. */
-  watchCount: number;
-  completedAt?: string;
-}
-
-export type BeltTestStatus =
-  | "none"
-  | "paid"
-  | "submitted"
-  | "passed"
-  | "failed";
-
-export interface BeltTest {
-  status: BeltTestStatus;
-  /** $20 testing fee paid (once; retakes are free). */
-  paidAt?: string;
-  submissionUrl?: string;
-  submissionPathname?: string;
-  submittedAt?: string;
-  reviewedAt?: string;
-  reviewerNote?: string;
-}
-
-export interface TaekwondoProgress {
-  /** Tiers (steps) the user is enrolled in. */
-  enrolledTiers: number[];
-  /** Per-lesson progress, keyed "t{tier}b{belt}l{lesson}". */
-  lessons: Record<string, LessonProgress>;
-  /** Per-belt test state, keyed "t{tier}b{belt}". */
-  beltTests: Record<string, BeltTest>;
 }
 
 export interface UserDoc {
@@ -77,35 +40,17 @@ export interface UserDoc {
   freeUse?: { date: string; count: number };
   /** Position on the 5-rung Guiding Principles ladder. */
   progress?: UserProgress;
-  /** Taekwondo program state (enrollment, lesson pacing, belt tests). */
-  taekwondo?: TaekwondoProgress;
   /** Tiers (steps) whose book the user has purchased ($25 each). */
   booksOwned?: number[];
   children?: ChildProfile[];
   createdAt?: Date;
 }
 
-// --- Guiding Principles (the 5-rung ladder / Taekwondo tiers) ---
+// --- Guiding Principles (the 5-rung ladder) ---
 
 export interface PrincipleFactor {
   name: string;
   description: string;
-}
-
-export interface BeltLesson {
-  name: string;
-  focus?: string;
-  /** The written lesson instruction (text section). */
-  instruction?: string;
-  /** Private Vercel Blob URL of the uploaded video clip. */
-  videoUrl?: string;
-  /** Blob pathname — used to mint signed playback URLs. */
-  videoPathname?: string;
-}
-
-export interface Belt {
-  name: string;
-  lessons: BeltLesson[];
 }
 
 export interface PrincipleBook {
@@ -128,7 +73,7 @@ export interface PrincipleRule {
 
 export interface Principle {
   _id?: ObjectId;
-  /** 1..5, unique. Also the Taekwondo Tier number. */
+  /** 1..5, unique (the rung number). */
   step: number;
   title: string;
   /** What the principle is really about, in plain terms. */
@@ -144,7 +89,6 @@ export interface Principle {
   /** Situational rules guiding how the coach applies this principle per context. */
   rules: PrincipleRule[];
   book: PrincipleBook;
-  tier: { priceCents: number; belts: Belt[] };
   updatedAt?: Date;
 }
 
@@ -196,7 +140,6 @@ export interface CoachResponse {
   /** The subject this answer is about (first name). */
   subjectName?: string;
   recommendedBook?: RecommendedBook;
-  taekwondoUpsell: boolean;
   /** False => the question fell outside the codex; UI shows an honest message. */
   groundedInCodex: boolean;
   matchedCodexIds: string[];

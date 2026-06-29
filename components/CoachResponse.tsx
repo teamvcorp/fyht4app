@@ -73,21 +73,6 @@ export function CoachResponse({ response }: { response: CoachResponseType }) {
           </p>
 
           <div className="mt-4 flex flex-col gap-2.5">
-            {response.taekwondoUpsell && (
-              <Link
-                href={`/membership?from=taekwondo${
-                  response.routedStep ? `&tier=${response.routedStep}` : ""
-                }`}
-                className="group flex items-center justify-between rounded-2xl bg-gradient-to-r from-brand-700 to-brand-600 px-4 py-3 text-white shadow-sm transition active:scale-[0.99]"
-              >
-                <span className="flex items-center gap-2 font-semibold">
-                  <span aria-hidden className="text-lg">🥋</span>
-                  Add Taekwondo lessons
-                </span>
-                <span className="text-white/80 transition group-hover:translate-x-0.5">→</span>
-              </Link>
-            )}
-
             {book &&
               (book.url ? (
                 <a

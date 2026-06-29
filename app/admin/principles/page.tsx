@@ -8,7 +8,7 @@ export default async function AdminPrinciplesPage() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-ink/45">
-        The 5-rung ladder. Each rung is a Taekwondo tier tied to one book.
+        The 5-rung ladder. Each rung is tied to one book.
       </p>
       {[1, 2, 3, 4, 5].map((step) => {
         const p = byStep.get(step);
